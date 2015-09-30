@@ -1,17 +1,84 @@
 <html>
   <head>
+    <style>
+      canvas {
+        width: 600px;
+        height: 400px;
+        border: 1px solid black;
+        display: block;
+        margin: 0 auto;
+      }
+    </style>
     <script src="/socket.io/socket.io.js"></script>
     <script>
       var socket;
+      var canvas;
+      var ctx;
+      var draws = {};
+      var name;
       
-      function init(){
+      function init() {
         socket = io.connect();
+        canvas = document.querySelector("#myCanvas")
+        ctx = this.canvas.getContext('2d');
+        
+        //socket listeners
+        enableListeners();
+        
+        var r = Math.floor(Math.random()*100 + 1);
+        name = "user" + r;
+        socket.emit('join', {name: name});
       }
       
+      function enableListeners() {
+        socket.on('joined', function(data) {
+          console.log(data.msg);
+        });
+        
+        socket.on('drawlin', function(data) {
+          handleMsg(data);
+        });
+      }
+      
+      function draw(data) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        var keys = Object.keys(draws);
+        keys.forEach(function(id, index) {
+          var drawCall = draws[keys[index]];
+          
+          ctx.save();
+          if(drawCall.user !== name) ctx.fillStyle = "red";
+          else ctx.fillStyle = "black";
+          ctx.fillRect(drawCall.info.x, drawCall.info.y, drawCall.info.w, drawCall.info.h);
+          ctx.restore();
+        });
+      }
+      
+      function setCalls() {
+        var time = new Date().getTime();
+        
+        //draws[time] = { x: 10, y: 10, w: 10, h: 10, fillStyle: "black" };
+        
+        //time = new Date().getTime();
+        var rX = Math.floor((Math.random()*canvas.width-10) + 10);
+        var rY = Math.floor((Math.random()*canvas.height-10) + 10);
+        var info = { x: rX, y: rY, w: 10, h: 10 }
+        
+        socket.emit('draw', { time: time, info: info, user: name });
+      }
+      
+      function handleMsg(data) {
+        draws = data;
+        draw(data);
+      }
+      
+      setInterval(setCalls, 3000);
       window.onload = init;
     </script>
   </head>
   
   <body>
+    <canvas id="myCanvas"></canvas>
   </body>
 </html>

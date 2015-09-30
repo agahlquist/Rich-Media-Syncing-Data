@@ -18,6 +18,32 @@ console.log('listening on 127.0.0.1: ' + port);
 
 var io = socketio(app);
 
-io.sockets.on('connection', function(data) {
-  //function listeners
+var users = {};
+var draws = {};
+
+function onJoin(socket) {
+  socket.on('join', function(data) {
+    users[data.name] = data.name;
+    
+    var msg = {
+      msg: "you have joined the server"
+    };
+    
+    socket.emit('joined', msg);
+    socket.name = data.name;
+  });
+}
+
+function onDraw(socket) {
+  socket.on('draw', function(data){
+    if(draws[data.time] == undefined) {
+      draws[data.time] = data;
+      io.sockets.emit('drawlin', draws);
+    }
+  });
+}
+
+io.sockets.on('connection', function(socket) {
+  onJoin(socket);
+  onDraw(socket);
 });
