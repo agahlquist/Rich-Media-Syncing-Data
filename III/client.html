@@ -1,0 +1,113 @@
+<html>
+  <head>
+    <style>
+      canvas {
+        border: 1px solid black;
+        display: block;
+        margin: 0 auto;
+      }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      var socket;
+      var canvas, ctx;
+      var draws = {};
+      var user, fill;
+
+      function init() {
+        socket = io.connect();
+
+        canvas = document.querySelector("#myCanvas");
+        canvas.width = 600;
+        canvas.height = 400;
+        ctx = this.canvas.getContext('2d');
+
+        user = 'user' + Math.floor(Math.random()*1000 + 1);
+        fill = getRandomColor();
+        
+        socket.emit('join', { name: user, fill: fill });
+
+        //socket listeners
+        socket.on('joined', function(data) {
+          console.log(data);
+          setup();
+        });
+        
+        socket.on('draw', function(data) {
+          handleMessage(data);
+        });
+        
+        socket.on('dc', function(data) {
+          delete draws[data];
+        });
+      }
+
+      //http://stackoverflow.com/questions/1484506/random-color-generator-in-javascript
+      function getRandomColor() {
+        var letters = '0123456789ABCDEF'.split('');
+        var color = '#';
+        for (var i = 0; i < 6; i++ ) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        var keys = Object.keys(draws);
+        
+        keys.forEach(function(id, index) {
+          var drawCall = draws[id];
+
+          ctx.save();
+          if(drawCall.name == user){
+            ctx.fillStyle = fill;
+            ctx.fillRect(drawCall.coords.x, drawCall.coords.y, drawCall.coords.w, drawCall.coords.h);
+          }
+          else {
+            ctx.strokeStyle = "black";
+            ctx.strokeRect(drawCall.coords.x, drawCall.coords.y, drawCall.coords.w, drawCall.coords.h);
+          }
+          ctx.restore();
+        });
+      }
+
+      function setup() {
+        var time = new Date().getTime();
+        var x = Math.floor(Math.random()*(canvas.width/4 - 10) + 10);
+        var y = Math.floor(Math.random()*(canvas.height - 10) + 10);
+        var coords = { x: x, y: y, w: 20, h: 20 }
+        
+        draws[user] = { name: user, lastUpdate: time, coords: coords };
+        draw();
+      }
+
+      function handleMessage(data) {
+        if(!draws[data.user]) {
+          draws[data.name] = { name: data.name, coords: data.coords, lastUpdate: data.lastUpdate };
+        }
+        else if(data.lastUpdate > data[data.name].lastUpdate) draws[data.name].coords = data.coords;
+
+        draw();
+      }
+
+      setInterval(function(){
+        var time = new Date().getTime();
+
+        draws[user].lastUpdate = time;
+        if(draws[user].coords.x >= canvas.width) draws[user].coords.x = 0;
+        else draws[user].coords.x += 5;
+        socket.emit('drawRequest', { name: user, coords: draws[user].coords, lastUpdate: draws[user].lastUpdate });
+
+        draw();
+      }, 1000);
+
+      window.onload = init;
+    </script>
+  </head>
+
+  <body>
+    <canvas id="myCanvas"></canvas>
+  </body>
+</html>
